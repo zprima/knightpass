@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KnightPass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12152a;
+    --panel: #1e2342;
+    --panel-2: #161a33;
+    --edge: #090b17;
+    --ink: #f5f1e4;
+    --muted: #a9afd0;
+    --track: #0c0f1f;
+    --ok: #8fe36b;
+    --level: #6b7090;
+    --pixel: "Press Start 2P", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 var(--body);
+  }
+  main {
+    width: 100%;
+    max-width: 720px;
+    background: var(--panel);
+    border: 4px solid var(--edge);
+    box-shadow: 0 8px 0 var(--edge);
+  }
+  header { padding: 20px 20px 16px; text-align: center; }
+  h1 { margin: 0 0 10px; font: 400 20px/1.3 var(--pixel); letter-spacing: 1px; }
+  header p { margin: 0; color: var(--muted); }
+
+  /* ---------- scene ---------- */
+  .scene {
+    position: relative;
+    height: clamp(210px, 44vw, 324px);
+    overflow: hidden;
+    background: #10131f;
+    image-rendering: pixelated;
+    border-block: 4px solid var(--edge);
+  }
+  .sky {
+    position: absolute;
+    inset: 0;
+    background: center bottom / cover no-repeat;
+    opacity: 0;
+    transition: opacity .9s;
+  }
+  .sky.on { opacity: 1; }
+  .rain {
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Cg fill='%23cfe0ff' fill-opacity='.55'%3E%3Crect x='6' y='4' width='2' height='10'/%3E%3Crect x='30' y='26' width='2' height='10'/%3E%3Crect x='18' y='48' width='2' height='10'/%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0;
+    transition: opacity .9s;
+    animation: rain .45s linear infinite;
+  }
+  .scene.storm .rain { opacity: 1; }
+  @keyframes rain { to { background-position: -48px 128px; } }
+
+  .hero-wrap, .foe-wrap {
+    position: absolute;
+    bottom: 6%;
+    transform: translateX(-50%);
+  }
+  .hero-wrap { left: 29%; height: 76%; aspect-ratio: 440 / 509; --ar: .49; }
+  .foe-wrap { left: 72%; }
+  .shadow {
+    position: absolute;
+    left: 50%;
+    bottom: -3%;
+    width: 46%;
+    height: 7%;
+    min-height: 8px;
+    transform: translateX(-50%);
+    background: rgba(10, 30, 5, .45);
+    border-radius: 50%;
+    transition: opacity .2s;
+  }
+  .foe-wrap .shadow { width: 80%; }
+  .pose {
+    position: absolute;
+    inset: 0;
+    transition: transform .25s steps(4, jump-none), filter .25s;
+  }
+  .pose img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    animation: bob 1.1s steps(2, jump-none) infinite;
+  }
+  .foe-wrap .pose img { animation-delay: -.5s; }
+  /* Knocked-out hero: tipped onto his back, resting on the grass. --ar is the sprite's width / height. */
+  .hero-wrap.down .pose { transform: translateY(calc(50% * (1 - var(--ar)))) rotate(-90deg); }
+  .down .pose img, .dead .pose img { animation: none; }
+  .down .shadow, .dead .shadow { opacity: 0; }
+  .snap .pose { transition: none; }
+  .pose.lunge { animation: lunge .32s steps(6, jump-none); }
+  @keyframes lunge { 50% { transform: translateX(var(--reach)); } }
+
+  .hero-wrap.pop, .foe-wrap.pop { animation: pop .35s steps(4, jump-none); }
+  .hero-wrap.max .hero {
+    filter: drop-shadow(0 0 6px #ffe98a) drop-shadow(0 0 16px rgba(255, 214, 80, .7));
+  }
+  @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-1.2%); } }
+  @keyframes pop {
+    0%   { transform: translateX(-50%) scale(.82, 1.12); filter: brightness(3); }
+    60%  { transform: translateX(-50%) scale(1.08, .95); filter: brightness(1.4); }
+    100% { transform: translateX(-50%) scale(1); filter: none; }
+  }
+  .sparkle {
+    position: absolute;
+    width: 6px; height: 6px;
+    background: #fff6b0;
+    box-shadow: 0 0 0 2px #ffcf3a;
+    opacity: 0;
+    animation: rise 1.4s steps(7, jump-none) infinite;
+  }
+  @keyframes rise {
+    0%   { opacity: 0; transform: translateY(0); }
+    20%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-70px); }
+  }
+  .rank {
+    position: absolute;
+    top: 12px; left: 12px;
+    padding: 9px 11px;
+    font: 400 11px/1.3 var(--pixel);
+    background: rgba(9, 11, 23, .88);
+    border: 3px solid var(--level);
+    color: var(--ink);
+  }
+  .toast {
+    position: absolute;
+    left: 50%;
+    top: 10%;
+    max-width: 90%;
+    padding: 8px 12px;
+    font: 400 10px/1.5 var(--pixel);
+    text-align: center;
+    color: #1a1400;
+    background: #ffe27a;
+    border: 3px solid var(--edge);
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .toast.show { animation: toast 1.8s steps(12, jump-none); }
+  @keyframes toast {
+    0%   { opacity: 0; transform: translate(-50%, 14px); }
+    12%  { opacity: 1; transform: translate(-50%, 0); }
+    80%  { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -8px); }
+  }
+
+  .gear {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin: 0;
+    background: var(--panel-2);
+    border-bottom: 4px solid var(--edge);
+  }
+  .gear div { padding: 10px 20px; }
+  .gear div + div { border-left: 4px solid var(--edge); }
+  .gear dt { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .gear dd { margin: 0; font-weight: 600; }
+  .gear .won { color: var(--ok); }
+  .gear .lost { color: #ff8a7d; }
+
+  /* ---------- controls ---------- */
+  .controls { padding: 20px; display: grid; gap: 20px; }
+  label { display: block; margin-bottom: 8px; font-weight: 600; }
+  .field { display: flex; }
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 13px 14px;
+    font: 18px/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--ink);
+    background: var(--track);
+    border: 3px solid var(--edge);
+    border-right: 0;
+    border-radius: 0;
+    outline: none;
+  }
+  input:focus { border-color: var(--level); }
+  button {
+    padding: 0 16px;
+    font: 600 14px/1 var(--body);
+    color: var(--ink);
+    background: #2c3360;
+    border: 3px solid var(--edge);
+    cursor: pointer;
+  }
+  button:hover { background: #3a4380; }
+  button:disabled { color: #6b7090; background: #232846; cursor: not-allowed; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .actions button { padding: 12px 16px; }
+  .actions .primary { flex: 1 1 0; min-width: 150px; color: #1a1400; background: #ffd24a; }
+  .actions .primary:hover { background: #ffe27a; }
+  #copy { min-width: 96px; }
+  #copy.done { color: var(--ok); }
+  button:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  /* ---------- strength meter ---------- */
+  .meter-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .verdict { font: 400 16px/1.3 var(--pixel); color: var(--level); }
+  .meter-head { flex-wrap: wrap; }
+  .crack { color: var(--muted); }
+  .crack b { color: var(--ink); }
+  .bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .seg {
+    height: 20px;
+    background: var(--track);
+    border: 3px solid var(--edge);
+  }
+  .seg i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--level);
+    box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .22), inset 0 3px 0 rgba(255, 255, 255, .28);
+    transition: width .2s steps(6, jump-none), background-color .2s;
+  }
+
+  /* ---------- advice ---------- */
+  .hint {
+    margin: 0;
+    padding: 12px 14px;
+    background: var(--panel-2);
+    border-left: 5px solid var(--level);
+  }
+  .hint b { color: var(--ink); }
+  .tips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .tips li {
+    padding: 5px 10px;
+    color: var(--muted);
+    background: var(--track);
+    border: 2px solid var(--edge);
+  }
+  .tips li::before { content: "· "; }
+  .tips li.ok { color: var(--ok); border-color: #2f5a28; }
+  .tips li.ok::before { content: "✓ "; }
+  .note { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 16px; }
+    .verdict { font-size: 13px; }
+    .gear { grid-template-columns: 1fr 1fr; }
+    .gear div { padding: 8px 12px; }
+    .gear div:last-child { grid-column: 1 / -1; border-left: 0; border-top: 4px solid var(--edge); }
+    .bar { gap: 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pose img, .pose.lunge, .hero-wrap.pop, .foe-wrap.pop, .sparkle, .rain { animation: none; }
+    .pose, .sky { transition: none; }
+    .seg i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>KnightPass</h1>
+    <p>The stronger your password, the better armed your hero.</p>
+  </header>
+
+  <div class="scene" id="scene">
+    <div id="skies"></div>
+    <div class="rain"></div>
+    <div class="foe-wrap" id="foeWrap">
+      <div class="shadow"></div>
+      <div class="pose" id="foePose"><img id="foe" alt=""></div>
+    </div>
+    <div class="hero-wrap" id="heroWrap">
+      <div class="shadow"></div>
+      <div class="pose" id="heroPose"><img class="hero" id="hero" alt=""></div>
+    </div>
+    <div class="rank" id="rank"></div>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+  </div>
+  <dl class="gear" aria-live="polite">
+    <div><dt>Weapon</dt><dd id="weapon"></dd></div>
+    <div><dt>Armor</dt><dd id="armor"></dd></div>
+    <div><dt>Foe</dt><dd id="foeText"></dd></div>
+  </dl>
+
+  <div class="controls">
+    <div>
+      <label for="pw">Your password</label>
+      <div class="field">
+        <input id="pw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+        <button type="button" id="toggle" aria-pressed="false">Show</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="generate">Generate random</button>
+        <button type="button" class="primary" id="generateWords">Generate passphrase</button>
+        <button type="button" id="copy" disabled>Copy</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="meter-head">
+        <span class="verdict" id="verdict"></span>
+        <span class="crack" id="crack"></span>
+      </div>
+      <div class="bar" id="bar" role="progressbar" aria-label="Password strength" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+    </div>
+
+    <p class="hint" id="hint" aria-live="polite"></p>
+
+    <ul class="tips" id="tips">
+      <li data-tip="len">12+ characters</li>
+      <li data-tip="case">Upper and lower case</li>
+      <li data-tip="digit">Number</li>
+      <li data-tip="symbol">Symbol</li>
+      <li data-tip="plain">No common words or patterns</li>
+    </ul>
+    <p class="note">Checked entirely in your browser. Nothing you type is sent anywhere.<br>
+      Crack time is a rough estimate for an attacker making 10 billion guesses per second.</p>
+  </div>
+</main>
+
+<script src="assets/words.js"></script>
+<script>
+const sprite = (kind, i) => `assets/${kind}${i}.png`;
+
+const LEVELS = [
+  { rank: 'Peasant',  verdict: 'Very weak', color: '#e2574a', weapon: 'Bare fists',        armor: 'Ragged tunic',                alt: 'Barefoot peasant with no weapon' },
+  { rank: 'Villager', verdict: 'Weak',      color: '#ee8a3c', weapon: 'Wooden club',       armor: 'Cloth shirt and boots',       alt: 'Villager holding a wooden club' },
+  { rank: 'Scout',    verdict: 'Fair',      color: '#ecc03a', weapon: 'Iron dagger',       armor: 'Leather vest and buckler',    alt: 'Scout in leather armor with dagger and buckler' },
+  { rank: 'Soldier',  verdict: 'Good',      color: '#b9d63c', weapon: 'Iron short sword',  armor: 'Chainmail and wooden shield', alt: 'Soldier in chainmail with sword and shield' },
+  { rank: 'Knight',   verdict: 'Strong',    color: '#5fce55', weapon: 'Steel longsword',   armor: 'Steel plate and kite shield', alt: 'Knight in steel plate armor' },
+  { rank: 'Paladin',  verdict: 'Legendary', color: '#ffd24a', weapon: 'Holy golden blade', armor: 'Gilded plate, cape and holy shield', alt: 'Paladin in white and gold plate armor with a glowing sword' },
+];
+const THRESHOLDS = [18, 32, 46, 62, 80];   // bits needed to reach levels 1..5
+const GUESSES_PER_SECOND = 1e10;           // a well-funded offline attack on a fast hash
+
+// The foe beaten at each level 1..5; at level 0 the first one beats the hero.
+// w/h are the standing sprite's pixels, kw/kh the knocked-out sprite's.
+const FOES = [
+  { name: 'Slime',    w: 279, h: 230, kw: 232, kh: 97 },
+  { name: 'Goblin',   w: 302, h: 336, kw: 300, kh: 185 },
+  { name: 'Skeleton', w: 369, h: 403, kw: 319, kh: 211 },
+  { name: 'Ogre',     w: 507, h: 481, kw: 464, kh: 269 },
+  { name: 'Dragon',   w: 563, h: 510, kw: 706, kh: 216 },
+];
+const SKY_FOR_LEVEL = [0, 1, 2, 2, 3, 4];  // storm, overcast, clear, clear, castle, golden sunset
+const WORD_SET = new Set(typeof WORDS === 'undefined' ? [] : WORDS);
+
+const COMMON = ['password','passw0rd','123456','12345678','123456789','qwerty','qwertyuiop','abc123','letmein',
+  'iloveyou','admin','welcome','monkey','dragon','football','baseball','sunshine','princess','master','shadow',
+  'superman','batman','trustno1','login','starwars','hello','freedom','whatever','111111','000000','654321',
+  'asdfgh','asdfghjkl','zxcvbn','zxcvbnm','1q2w3e','1q2w3e4r','qazwsx','secret','summer','winter','knight','paladin'];
+const SEQS = ['abcdefghijklmnopqrstuvwxyz', '0123456789', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+function unleet(s) {
+  return s.toLowerCase().replace(/[@4]/g, 'a').replace(/0/g, 'o').replace(/[1!]/g, 'i')
+          .replace(/3/g, 'e').replace(/[5$]/g, 's').replace(/7/g, 't');
+}
+
+// Counts characters that add little: repeats of the previous char and steps along a keyboard/alphabet run.
+function predictableChars(pw) {
+  const s = pw.toLowerCase();
+  let n = 0;
+  for (let i = 1; i < s.length; i++) {
+    const pair = s[i - 1] + s[i];
+    if (s[i] === s[i - 1]) { n++; continue; }
+    if (SEQS.some(q => q.includes(pair) || q.includes(s[i] + s[i - 1]))) n++;
+  }
+  return n;
+}
+
+function analyze(pw) {
+  const has = {
+    lower: /[a-z]/.test(pw), upper: /[A-Z]/.test(pw),
+    digit: /\d/.test(pw), symbol: /[^A-Za-z0-9]/.test(pw),
+  };
+  const pool = (has.lower ? 26 : 0) + (has.upper ? 26 : 0) + (has.digit ? 10 : 0) + (has.symbol ? 33 : 0);
+  const plainText = unleet(pw);
+  const lower = pw.toLowerCase();
+  // Longest common password hidden inside; its characters are worth almost nothing.
+  let dictLen = 0;
+  for (const w of COMMON) {
+    if ((lower.includes(w) || plainText.includes(w)) && w.length > dictLen) dictLen = w.length;
+  }
+  const predictable = predictableChars(pw);
+  const unique = new Set(pw).size;
+
+  let effective = pw.length - dictLen * 0.85 - Math.max(0, predictable - dictLen) * 0.7;
+  effective = Math.min(effective, unique * 2.5);      // "aaaaaaaaaaaa" is not twelve characters of strength
+  effective = Math.max(effective, pw.length ? 1 : 0);
+  let bits = pool ? effective * Math.log2(pool) : 0;
+
+  // Made only of dictionary words? Then an attacker guesses whole words, not letters.
+  const words = lower.split(/[^a-z]+/).filter(Boolean);
+  if (words.length && words.every(w => WORD_SET.has(w))) {
+    const digits = (pw.match(/\d/g) || []).length;
+    const wordBits = words.length * Math.log2(7776) + digits * Math.log2(10) + (has.upper ? 2 : 0) + (has.symbol ? 5 : 0);
+    bits = Math.min(bits, wordBits);
+  }
+
+  let level = 0;
+  while (level < 5 && bits >= THRESHOLDS[level]) level++;
+  // How far along the way to the next level, 0..1.
+  const floor = level ? THRESHOLDS[level - 1] : 0;
+  const toNext = level < 5 ? (bits - floor) / (THRESHOLDS[level] - floor) : 0;
+  const plain = pw.length > 0 && dictLen === 0 && predictable <= pw.length * 0.4;
+  return {
+    level, toNext, has, bits,
+    tips: { len: pw.length >= 12, case: has.lower && has.upper, digit: has.digit, symbol: has.symbol, plain },
+  };
+}
+
+function crackTime(bits) {
+  const seconds = 2 ** (bits - 1) / GUESSES_PER_SECOND;   // on average half the possibilities are tried
+  if (seconds < 1) return 'instantly';
+  const year = 31557600;
+  const units = [
+    [60, 1, 'second'], [3600, 60, 'minute'], [86400, 3600, 'hour'], [2629800, 86400, 'day'],
+    [year, 2629800, 'month'], [100 * year, year, 'year'], [1000 * year, 100 * year, 'century'],
+    [1e6 * year, 1000 * year, 'thousand years'], [1e9 * year, 1e6 * year, 'million years'],
+    [1e12 * year, 1e9 * year, 'billion years'],
+  ];
+  for (const [limit, size, name] of units) {
+    if (seconds < limit) {
+      const n = Math.max(1, Math.round(seconds / size));
+      if (name.endsWith('years')) return `${n} ${name}`;
+      return `${n} ${n === 1 ? name : name === 'century' ? 'centuries' : name + 's'}`;
+    }
+  }
+  return 'trillions of years';
+}
+
+function advice(pw, { level, tips, has }) {
+  if (!pw) return 'Type a password to start arming your hero.';
+  if (level === 5) return '<b>Fully geared.</b> This password is ready for battle.';
+  let how;
+  if (!tips.plain) how = 'avoid common words, repeats and runs like “1234” or “qwerty”';
+  else if (!tips.len) how = 'make it longer, aiming for 12 or more characters';
+  else {
+    const missing = [];
+    if (!has.upper) missing.push('a capital letter');
+    if (!has.lower) missing.push('a lowercase letter');
+    if (!has.digit) missing.push('a number');
+    if (!has.symbol) missing.push('a symbol');
+    how = missing.length ? 'add ' + missing.join(' or ') : 'add a few more characters';
+  }
+  return `<b>Next: ${LEVELS[level + 1].rank}.</b> To get there, ${how}.`;
+}
+
+const $ = id => document.getElementById(id);
+const input = $('pw'), hero = $('hero'), wrap = $('heroWrap'), bar = $('bar'), toast = $('toast');
+const foe = $('foe'), foeWrap = $('foeWrap'), scene = $('scene');
+const calm = matchMedia('(prefers-reduced-motion: reduce)');
+let shown = -1, fightKey = '', fightTimers = [];
+
+for (let i = 0; i < 5; i++) {
+  $('skies').insertAdjacentHTML('beforeend', `<div class="sky" style="background-image:url(${sprite('bg', i)})"></div>`);
+  new Image().src = sprite('enemy', i);
+  new Image().src = sprite('enemy', i + '_ko');
+}
+const skies = [...$('skies').children];
+
+// One bar segment per level that can be earned (1..5).
+for (let i = 1; i <= 5; i++) bar.insertAdjacentHTML('beforeend', '<div class="seg"><i></i></div>');
+const fills = [...bar.querySelectorAll('i')];
+LEVELS.forEach((_, i) => { new Image().src = sprite('hero', i); });   // preload so upgrades swap instantly
+
+function setSparkles(on) {
+  wrap.querySelectorAll('.sparkle').forEach(s => s.remove());
+  if (!on) return;
+  for (let i = 0; i < 7; i++) {
+    const s = document.createElement('span');
+    s.className = 'sparkle';
+    s.style.left = (8 + Math.random() * 84) + '%';
+    s.style.top = (25 + Math.random() * 60) + '%';
+    s.style.animationDelay = (i * 0.2) + 's';
+    wrap.appendChild(s);
+  }
+}
+
+function restart(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+function setFoeText(text, cls) {
+  $('foeText').textContent = text;
+  $('foeText').className = cls || '';
+}
+
+// Puts the right foe on the field and plays out the fight.
+// outcome: 'idle' (no password, foe just lurks), 'lose' (foe floors the hero) or 'win' (hero floors the foe).
+function stageFight(outcome, level, instant) {
+  fightTimers.forEach(clearTimeout);
+  fightTimers = [];
+  const index = Math.max(0, level - 1), f = FOES[index];
+  const win = outcome === 'win';
+
+  const showFoe = knockedOut => {
+    const w = knockedOut ? f.kw : f.w, h = knockedOut ? f.kh : f.h;
+    foe.src = sprite('enemy', index + (knockedOut ? '_ko' : ''));
+    foeWrap.style.height = (h * 76 / 509) + '%';     // same pixel scale as the hero sprite
+    foeWrap.style.aspectRatio = `${w} / ${h}`;
+    foeWrap.classList.toggle('dead', knockedOut);
+  };
+  showFoe(false);
+  // Stand both fighters back up without animating the recovery.
+  for (const el of [wrap, foeWrap]) el.classList.add('snap');
+  wrap.classList.remove('down');
+  void foeWrap.offsetWidth;
+  for (const el of [wrap, foeWrap]) el.classList.remove('snap');
+
+  if (outcome === 'idle') return setFoeText(`A ${f.name} approaches`);
+  const finish = () => {
+    if (win) {
+      showFoe(true);
+      if (!instant) restart(foeWrap, 'pop');
+    } else wrap.classList.add('down');
+    setFoeText(win ? `${f.name}: defeated` : `${f.name}: knocked you out`, win ? 'won' : 'lost');
+  };
+  if (instant) return finish();
+
+  setFoeText(`Fighting the ${f.name}…`);
+  restart(foeWrap, 'pop');
+  fightTimers.push(setTimeout(() => {
+    const attacker = $(win ? 'heroPose' : 'foePose');
+    const gap = foeWrap.offsetLeft - wrap.offsetLeft;
+    attacker.style.setProperty('--reach', (win ? 1 : -1) * gap * 0.55 + 'px');
+    restart(attacker, 'lunge');
+  }, 450));
+  fightTimers.push(setTimeout(finish, 610));
+}
+
+function render() {
+  const pw = input.value;
+  const result = analyze(pw);
+  const { level, toNext, tips, bits } = result;
+  const L = LEVELS[level];
+
+  document.documentElement.style.setProperty('--level', pw ? L.color : '#6b7090');
+  fills.forEach((f, i) => { f.style.width = (i < level ? 100 : i === level ? toNext * 100 : 0) + '%'; });
+  bar.setAttribute('aria-valuenow', Math.round((level + toNext) / 5 * 100));
+  bar.setAttribute('aria-valuetext', pw ? `${L.verdict}, level ${level} of 5` : 'Empty');
+  $('verdict').textContent = pw ? L.verdict : 'No password yet';
+  $('crack').innerHTML = pw ? `Time to crack: <b>${crackTime(bits)}</b>` : '';
+  const sky = SKY_FOR_LEVEL[level];
+  skies.forEach((s, i) => s.classList.toggle('on', i === sky));
+  scene.classList.toggle('storm', sky === 0);
+  $('rank').textContent = `Lv ${level} · ${L.rank}`;
+  $('weapon').textContent = L.weapon;
+  $('armor').textContent = L.armor;
+  $('hint').innerHTML = advice(pw, result);
+  $('copy').disabled = !pw;
+  document.querySelectorAll('#tips li').forEach(li => li.classList.toggle('ok', !!tips[li.dataset.tip]));
+
+  if (level !== shown) {
+    const first = shown === -1, up = level > shown;
+    shown = level;
+    hero.src = sprite('hero', level);
+    hero.alt = L.alt;
+    wrap.classList.toggle('max', level === 5);
+    setSparkles(level === 5);
+    if (!first) restart(wrap, 'pop');
+    if (!first && up) {
+      toast.textContent = `New gear: ${L.weapon}`;
+      restart(toast, 'show');
+    }
+  }
+
+  const outcome = !pw ? 'idle' : level === 0 ? 'lose' : 'win';
+  if (fightKey !== outcome + level) {
+    const first = fightKey === '';
+    fightKey = outcome + level;
+    stageFight(outcome, level, first || calm.matches);
+  }
+}
+
+input.addEventListener('input', render);
+function setVisible(show) {
+  input.type = show ? 'text' : 'password';
+  $('toggle').textContent = show ? 'Hide' : 'Show';
+  $('toggle').setAttribute('aria-pressed', show);
+}
+$('toggle').addEventListener('click', () => {
+  setVisible(input.type === 'password');
+  input.focus();
+});
+
+// Uniform random index below n from the browser's cryptographic generator (no modulo bias).
+function randomBelow(n) {
+  const limit = 256 - (256 % n), buf = new Uint8Array(1);
+  do crypto.getRandomValues(buf); while (buf[0] >= limit);
+  return buf[0] % n;
+}
+function generatePassword(length = 18) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*-_=+?';
+  for (;;) {
+    let pw = '';
+    for (let i = 0; i < length; i++) pw += chars[randomBelow(chars.length)];
+    if (isTopTier(pw)) return pw;
+  }
+}
+// Six random dictionary words plus two digits, e.g. "Copper-Lantern-Violet-Marsh-Tundra-Habit-47".
+// The strength is in the word choice (7772^6 combinations); capitals and hyphens are for readability.
+function generatePassphrase(count = 6) {
+  for (;;) {
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+      // Two random bytes cover the list; redraw values past the last full multiple to stay unbiased.
+      const buf = new Uint16Array(1), limit = 65536 - (65536 % WORDS.length);
+      do crypto.getRandomValues(buf); while (buf[0] >= limit);
+      const w = WORDS[buf[0] % WORDS.length];
+      parts.push(w[0].toUpperCase() + w.slice(1));
+    }
+    parts.push('' + randomBelow(10) + randomBelow(10));
+    const pw = parts.join('-');
+    if (isTopTier(pw)) return pw;
+  }
+}
+// Redraw the rare result that misses a check or happens to contain a pattern.
+function isTopTier(pw) {
+  const r = analyze(pw);
+  return r.level === 5 && Object.values(r.tips).every(Boolean);
+}
+function fill(pw) {
+  input.value = pw;
+  setVisible(true);          // a password you can't see is hard to trust or save
+  render();
+}
+$('generate').addEventListener('click', () => fill(generatePassword()));
+$('generateWords').addEventListener('click', () => fill(generatePassphrase()));
+if (!WORD_SET.size) $('generateWords').hidden = true;   // word list failed to load
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older browsers and pages opened without clipboard permission.
+    const wasHidden = input.type === 'password';
+    input.type = 'text';
+    input.select();
+    const ok = document.execCommand('copy');
+    input.setSelectionRange(input.value.length, input.value.length);
+    if (wasHidden) input.type = 'password';
+    return ok;
+  }
+}
+let copyTimer;
+$('copy').addEventListener('click', async e => {
+  const btn = e.currentTarget;
+  const ok = await copyText(input.value);
+  btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+  btn.classList.toggle('done', ok);
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+});
+render();
+</script>
+</body>
+</html>
